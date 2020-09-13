@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 SET(CMAKE_BUILD_TYPE "Debug")
@@ -36,11 +36,16 @@ if (CMAKE_VERSION VERSION_LESS 2.8.11)
 endif()
 
 find_package(glog 0.4.0 REQUIRED)
+find_package(Boost REQUIRED)
 
 include_directories(header)
 aux_source_directory(src SRCS)
 add_executable(${CMAKE_PROJECT_NAME} ${SRCS})
-target_link_libraries(${CMAKE_PROJECT_NAME} glog::glog)
+target_link_libraries(${CMAKE_PROJECT_NAME} glog::glog pthread)
+
+include_directories(${Boost_INCLUDE_DIRS})
+add_executable(coroutines ./test/coroutine_test.cc)
+target_link_libraries(coroutines boost_context)
 
 #add_executable(db_test ./test/test.cc)
 #target_link_libraries(db_test ${CMAKE_PROJECT_NAME})
