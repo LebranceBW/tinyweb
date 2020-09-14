@@ -41,7 +41,7 @@ find_package(Boost REQUIRED)
 include_directories(header)
 aux_source_directory(src SRCS)
 add_executable(${CMAKE_PROJECT_NAME} ${SRCS})
-target_link_libraries(${CMAKE_PROJECT_NAME} glog::glog pthread)
+target_link_libraries(${CMAKE_PROJECT_NAME} glog::glog boost_context)
 
 include_directories(${Boost_INCLUDE_DIRS})
 add_executable(coroutines ./test/coroutine_test.cc)

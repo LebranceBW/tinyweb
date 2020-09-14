@@ -1,27 +1,27 @@
 #include <boost/coroutine2/all.hpp>
 #include <iostream>
 
-typedef boost::coroutines2::coroutine<long long> coro_t;
+typedef boost::coroutines2::coroutine<int> coro_t;
 
 int main() {
-  coro_t::pull_type source([&](coro_t::push_type& sink) {
-    long long first = 1, second = 1;
-    sink(first);
-    sink(second);
+  coro_t::push_type sink2([&](coro_t::pull_type& source) {
     while (true) {
-      long long third = first + second;
-      first = second;
-      second = third;
-      sink(third);
+      source();
+      std::cout << source.get() << " " << std::endl;
     }
   });
 
-  coro_t::push_type sink([&](coro_t::pull_type& source) { std::cout << source().get() << " "; });
+  coro_t::pull_type source([&](coro_t::push_type& sink) {
+    int first = 1, second = 1;
+    sink2(first);
+    sink2(second);
 
-  source(sink);
-  //   for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 8; i++) {
+      int third = first + second;
+      first = second;
+      second = third;
+      sink2(third);
+    }
+  });
 
-  // source();
-  //   }
-  //   !source;
 }

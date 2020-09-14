@@ -1,24 +1,22 @@
 #pragma once
-#include <pthread.h>
-#include <string>
-#include <sys/socket.h>
-#include <sys/types.h>
 
+#include "http.h"
+#include <boost/coroutine2/all.hpp>
+#include <deque>
+#include <string>
+
+using coro_t = boost::coroutines2::coroutine<void>;
+using coro_string_t = boost::coroutines2::coroutine<std::string>;
 class Connection {
 public:
-  pthread_t thread;
-  pthread_cond_t _read_cond = PTHREAD_COND_INITIALIZER;
-  pthread_cond_t _write_cond = PTHREAD_COND_INITIALIZER;
-  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  std::string req_buf;
+  coro_t::push_type ReadFromSocket;
+  coro_t::push_type WriteToSocket;
+  coro_string_t::push_type HttpHandler;
+  int _connection_fd;
 
-  int _conn_fd;
-  int _epoll_fd;
-  Connection(int epoll_fd, int conn_fd);
-
-  void TriggerWrite();
-  void TriggerRead();
-  std::string ProduceRsp(const std::string& req);
-
+  std::deque<std::string> send_buf;
+  Connection(int fd);
+  Connection() = delete;
   ~Connection();
+  std::string ProduceRsp(const HTTPReq& req);
 };

@@ -1,36 +1,27 @@
 #include "connection.h"
 #include <arpa/inet.h>
-#include <cstdlib>
-#include <cstring>
 #include <errno.h>
-#include <fcntl.h>
 #include <glog/logging.h>
-#include <iostream>
 #include <map>
+#include <memory>
 #include <signal.h>
-#include <string.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 
-std::map<int, Connection*> m;
+using std::shared_ptr;
+constexpr int MAX_EVENT_NUM = 65535;
+std::map<int, shared_ptr<Connection>> m;
 
 int socket_fd, epoll_fd;
 
 bool onRunning = true;
 void signal_handler(int signal) {
-  switch (signal) {
-  case SIGINT:
-  case SIGKILL:
-    onRunning = false;
-    LOG(INFO) << "close server";
-    close(socket_fd);
-    close(epoll_fd);
-    for (auto iter : m) {
-      delete iter.second;
-    }
-    break;
-  }
+  onRunning = false;
+  LOG(INFO) << "close server";
+  close(epoll_fd);
+  close(socket_fd);
+  for (const auto& iter : m)
+    close(iter.first);
 }
 
 int create_socket(char ip[], int port) {
@@ -51,18 +42,18 @@ int create_socket(char ip[], int port) {
 void accept_new_connection(int socket_fd, int epoll_fd) {
   struct sockaddr_in client_addr;
   socklen_t addr_len = sizeof(struct sockaddr_in);
-  while (1) {
+  while (true) {
     int client_fd = accept4(socket_fd, (sockaddr*)&client_addr, &addr_len, SOCK_NONBLOCK);
     if (client_fd < 0) {
       if (errno != EAGAIN && errno != EWOULDBLOCK)
         LOG(ERROR) << "Bad Connection. " << strerror(errno);
       break;
     } else {
-      LOG(INFO) << "Receive connect from IP:" << inet_ntoa(client_addr.sin_addr) << ":"
+      LOG(INFO) << "Connection established. IP:" << inet_ntoa(client_addr.sin_addr) << ":"
                 << client_addr.sin_port;
-      m[client_fd] = new Connection(epoll_fd, client_fd);
+      m[client_fd] = shared_ptr<Connection>(new Connection(client_fd));
       struct epoll_event epoll_client_event {
-        .events = EPOLLIN | EPOLLET | EPOLLHUP, .data = {.fd = client_fd},
+        .events = EPOLLIN | EPOLLET, .data = {.fd = client_fd},
       };
       int ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &epoll_client_event);
       LOG_IF(ERROR, ret < 0) << "Error to add a new connection to epoll" << strerror(errno);
@@ -75,30 +66,27 @@ int start_service(char ip[], int port) {
   epoll_fd = epoll_create1(0);
   CHECK(epoll_fd != -1) << "Error to create epoll. " << strerror(errno);
   struct epoll_event eve = {
-      .events = EPOLLIN | EPOLLOUT | EPOLLET,
+      .events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET,
       .data = {.fd = socket_fd},
   };
-  signal(SIGINT, signal_handler);
-  signal(SIGSTOP, signal_handler);
-  signal(SIGKILL, signal_handler);
-  struct epoll_event events[256];
+  struct epoll_event events[MAX_EVENT_NUM];
   int ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, socket_fd, &eve);
-  CHECK(epoll_fd != -1) << "Error to add epoll fd. " << strerror(errno);
+  CHECK(ret != -1) << "Error to monitor socket fd. " << strerror(errno);
   while (onRunning) {
-    int ready = epoll_wait(epoll_fd, events, 256, -1);
+    int ready = epoll_wait(epoll_fd, events, MAX_EVENT_NUM, 10);
     CHECK(ready >= 0 || (errno == EINTR)) << "Epoll events error. " << strerror(errno);
     for (int i = 0; i < ready; i++) {
-      auto event = events[i];
+      auto& event = events[i];
       if (event.data.fd == socket_fd)
         accept_new_connection(socket_fd, epoll_fd);
-      else if (event.events & EPOLLRDHUP) {
+      else if (event.events & EPOLLIN) {
+        m[event.data.fd]->ReadFromSocket();
+      } else if (event.events & EPOLLOUT) {
+        m[event.data.fd]->WriteToSocket();
+      } else if (event.events & EPOLLRDHUP) {
         LOG(INFO) << "Connection closed";
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, event.data.fd, NULL);
-        delete m[event.data.fd];
-      } else if (event.events & EPOLLIN) {
-        m[event.data.fd]->TriggerRead();
-      } else if (event.events & EPOLLOUT) {
-        m[event.data.fd]->TriggerWrite();
+        m.erase(event.data.fd);
       }
     }
   }
@@ -110,5 +98,8 @@ int main(int argc, char* argv[]) {
   google::LogToStderr();
   google::SetStderrLogging(0);
   CHECK(argc == 3) << "Error to launch web.";
+  signal(SIGINT, signal_handler);
+  signal(SIGSTOP, signal_handler);
+  signal(SIGKILL, signal_handler);
   start_service(argv[1], atoi(argv[2]));
 }
