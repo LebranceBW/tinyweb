@@ -47,3 +47,11 @@ public:
     return ReqTypeToString(req_type) + " from " + source_ip + " " + virtual_dir;
   }
 };
+
+class HTTPRsp {
+
+};
+
+class HTTPHandler {
+  static HTTPRsp handler(HTTPReq req);
+};

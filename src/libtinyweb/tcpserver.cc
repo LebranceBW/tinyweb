@@ -6,7 +6,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 
-TcpServer::TcpServer(TcpEventHandler* handler) : handler(handler) {
+TcpServer::TcpServer(TcpEventManager* handler) : handler(handler) {
 }
 
 TcpServer::~TcpServer() {
@@ -16,7 +16,6 @@ TcpServer::~TcpServer() {
 void TcpServer::StartService(char ip[], int port) {
   CHECK(!hasStarted) << "Tcp server has been started.";
   hasStarted = true;
-
   socket_fd = OpenSocket(ip, port);
   epoll_fd = epoll_create1(0);
   CHECK(epoll_fd != -1) << "Error to create epoll. " << strerror(errno);
@@ -36,17 +35,13 @@ void TcpServer::StartService(char ip[], int port) {
       auto& event = events[i];
       if (event.data.fd == socket_fd)
         AcceptNewConnection(socket_fd, epoll_fd);
-      else if (event.events & EPOLLIN) {
-        handler->onReadable(event.data.fd);
-        // m[event.data.fd]->ReadFromSocket();
-      } else if (event.events & EPOLLOUT) {
-        handler->onWriteable(event.data.fd);
-        // m[event.data.fd]->WriteToSocket();
-      } else if (event.events & EPOLLRDHUP) {
-        LOG(INFO) << "Connection closed";
+      else if (event.events & EPOLLRDHUP) {
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, event.data.fd, NULL);
-        handler->onClosed(event.data.fd);
-        // m.erase(event.data.fd);
+        handler -> handle(TcpEvent(event.data.fd, EventType::CLOSE));
+      } else if (event.events & EPOLLIN) {
+        handler -> handle(TcpEvent(event.data.fd, EventType::READABLE));
+      } else if (event.events & EPOLLOUT) {
+        handler -> handle(TcpEvent(event.data.fd, EventType::WRITABLE));
       }
     }
   }
@@ -64,7 +59,7 @@ void TcpServer::AcceptNewConnection(int socket_fd, int epoll_fd) {
     } else {
       LOG(INFO) << "Connection established. IP:" << inet_ntoa(client_addr.sin_addr) << ":"
                 << client_addr.sin_port;
-      handler->onEstablished(client_fd);
+      handler -> handle({client_fd, EventType::ACCEPTED});
       struct epoll_event epoll_client_event {
         .events = EPOLLIN | EPOLLET, .data = {.fd = client_fd},
       };
@@ -84,7 +79,7 @@ int TcpServer::OpenSocket(char ip[], int port) {
   server_addr.sin_addr.s_addr = inet_addr(ip);
   int ret = bind(socket_fd, (struct sockaddr*)&server_addr, sizeof(struct sockaddr_in));
   CHECK(ret != -1) << "Error to bind server to " << ip << ":" << port << ". " << strerror(errno);
-  ret = listen(socket_fd, 10);
+  ret = listen(socket_fd, 100);
   CHECK(ret != -1) << "Error to listen to socket. " << strerror(errno);
   return socket_fd;
 }

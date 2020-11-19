@@ -1,0 +1,25 @@
+add_cxxflags("-g", "-std=c++17")
+add_includedirs("src/libtinyweb", "third-party/pystring", "third-party/coroutine/")
+
+includes("third-party", "test")
+
+target("libtinyweb")
+    set_default(false)
+    set_kind("static")
+    add_files("src/libtinyweb/*.cc")
+    add_deps("pystring", "coroutine")
+
+target("tinyweb")
+    set_default(true)
+    on_load(function (target)
+        target:add(find_packages("glog"))
+    end)
+    set_kind("binary")
+    set_targetdir("$(projectdir)/target")
+    add_files("src/tinyweb.cc")
+    add_deps("libtinyweb")
+    on_package(function (target)
+        os.cp("./html", "$(projectdir)/target/html")
+        os.run("zip -r tinyweb.zip $(projectdir)/target/")
+    end)
+    

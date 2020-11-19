@@ -1,3 +1,7 @@
 .vscode/
 build/
-third-party/libco/
+target/
+*.zip
+# third-party/pystring/
+reference/
+.xmake/

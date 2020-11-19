@@ -1,0 +1,6 @@
+[submodule "third-party/coroutine"]
+	path = third-party/coroutine
+	url = https://github.com/cloudwu/coroutine
+[submodule "third-party/pystring"]
+	path = third-party/pystring
+	url = https://github.com/imageworks/pystring
