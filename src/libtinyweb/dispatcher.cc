@@ -6,8 +6,6 @@ void Dispatcher::removeIfFinished(Socket_t socket_id, Corot_t corot_id) {
   if (!scheduler.isActive(corot_id)) {
     close(socket_id);
     info_table.erase(socket_id);
-    register_table.erase(socket_id);
-    LOG(INFO) << "Connection close";
   }
 }
 
@@ -24,24 +22,19 @@ void Dispatcher::handle(TcpEvent event) {
     break;
   }
   case EventType::READABLE: {
-    // if (register_table[socket_id] == EventType::READABLE) {
     Corot_t corot_id = info_table[socket_id].corot_id;
     scheduler.resume(corot_id);
     removeIfFinished(socket_id, corot_id);
-    // }
     break;
   }
   case EventType::WRITABLE: {
-    // if (register_table[socket_id] == EventType::WRITABLE) {
     Corot_t corot_id = info_table[socket_id].corot_id;
     scheduler.resume(corot_id);
     removeIfFinished(socket_id, corot_id);
-    // }
     break;
   }
   case EventType::CLOSE:
+    close(socket_id);
     break;
-  default:
-    LOG(INFO) << "error";
   }
 }

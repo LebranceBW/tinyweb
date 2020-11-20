@@ -19,7 +19,7 @@ target("tinyweb")
     add_files("src/tinyweb.cc")
     add_deps("libtinyweb")
     on_package(function (target)
-        os.cp("./html", "$(projectdir)/target/html")
+        os.cp("./html", "$(projectdir)/target/")
         os.run("zip -r tinyweb.zip $(projectdir)/target/")
     end)
     

@@ -11,7 +11,6 @@ struct CoroutineInfo {
 
 class Dispatcher : public TcpEventManager {
   std::map<Socket_t, CoroutineInfo> info_table;
-  std::map<Socket_t, EventType> register_table;
   Scheduler scheduler;
 
 public:
