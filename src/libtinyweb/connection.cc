@@ -49,8 +49,11 @@ void ConnectionHandler(CoSheduler* _, CoroutineInfo* info) {
   vector<string> pieces;
   string s(buf);
   pystring::split(s, pieces);
-  if (pieces.size() != 3)
-    LOG(ERROR) << "error header: " << buf;
+  if (pieces.size() != 3){
+    LOG(ERROR) << "Header: " << buf << " cannot analysis";
+    return;
+  }
+
 
   LOG(INFO) << s;
   while (is)
